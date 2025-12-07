@@ -1,8 +1,9 @@
+from app.main import app
+import uvicorn
 
 def main():
     print("Hello from teddy-test!")
 
 
 if __name__ == "__main__":
-    main()
-    print("Hola este es un test")
+    uvicorn.run(app, host="0.0.0.0", port=8000)
