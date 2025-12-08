@@ -1,73 +1,68 @@
-# NOTE: This module have all functions to process the resume documents
-# Typing libs
 from fastapi import UploadFile
+from app.models.constants import resume_keywords_en, resume_keywords_es, resume_keywords_pt
+from app.models.constants import TESSERACT_LANGS
+from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, List, Optional, Union
+from PIL import Image
+
 from pathlib import Path
-from typing  import Any
-from typing  import List
-from typing  import Dict
-from typing  import Union
-from typing  import Optional
-# Procesators
+from pdfminer.pdfparser import PDFParser
+from pdfminer.pdfdocument import PDFDocument
+from pdfminer.pdfpage import PDFPage
+from pdfminer.pdftypes import PDFObjRef, resolve1
+from pdf2image import convert_from_path
+
 import pdfplumber
 import pytesseract
 import PyPDF2
-from pdfminer.high_level    import extract_pages
-from pdfminer.pdfparser     import PDFParser
-from pdfminer.pdfdocument   import PDFDocument
-from pdfminer.pdfpage       import PDFPage
-from pdfminer.pdftypes      import resolve1, PDFObjRef
-from pdf2image              import convert_from_path
-# Utilitaries
-from concurrent.futures import ThreadPoolExecutor
-from PIL import Image
+import re
 import requests
 import tempfile
-import re
+import unicodedata
+
+def _normalize_text(text: str) -> str:  
+    text_nfkd = unicodedata.normalize("NFKD", text)
+    return "".join(c for c in text_nfkd if not unicodedata.combining(c)).lower()
+
 
 def _get_valid_url(uri_str: str) -> str:
-
     if any(x in uri_str.lower() for x in ["mailto:", "tel:", "wikipedia.org", "gmail.com"]):
-        return ''
-        
+        return ""
     url_pattern = r'(?:https?://)?(?:www\.)?[a-zA-Z0-9.-]+\.(?:com|ai|org|net|edu|gov|mil|in|info|co\.br)(?:/[a-zA-Z0-9./-]*)?'
     try:
         matches = re.findall(url_pattern, uri_str)
         if not matches:
-            return ''
-        
+            return ""
+
         url = matches[0]
-        if not url.startswith(('http://', 'https://')):
-            url = 'https://' + url
-            
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url
+
         return url
-    except Exception as e:
-        return ''
+    except Exception:
+        return ""
 
 def _validate_resume_content(text: str) -> bool:
     
-    resume_keywords = [
-        "experience", "education", "skills", "qualification",
-        "projects", "certification", "work", "employment",
-        "job", "profile", "accomplishment", "achievement",
-        "responsibility", "university", "college", "degree"
-    ]
+    resume_keywords = resume_keywords_en + resume_keywords_es + resume_keywords_pt
     
-    text_lower = text.lower()
+    normalized = _normalize_text(text)
+    words = normalized.split()
+    
     matches = sum(1 for keyword in resume_keywords 
                 if any(word.startswith(keyword) 
-                    for word in text_lower.split()))
+                    for word in words))
 
-    min_required = 3 if len(text_lower.split()) < 200 else 4
+    min_required = 3 if len(words) < 200 else 4
 
     is_resume = matches >= min_required
 
     return is_resume
 
 def _extract_plain_text_links(text: str) -> List[str]:
-    links = []
     url_pattern = r'(?:https?://)?(?:www\.)?[a-zA-Z0-9.-]+\.(?:com|org|net|edu|gov|mil|in|info|co\.br)(?:/[a-zA-Z0-9./-]*)?'
-    
     matches = re.findall(url_pattern, text)
+    links: List[str] = []
     for match in matches:
         valid_url = _get_valid_url(match.rstrip('/'))
         if valid_url:
@@ -81,7 +76,7 @@ async def extract_text_from_image(image_path: Path) -> Dict[str, Union[str, List
     
     try:
         image    = Image.open(image_path)
-        ocr_text = pytesseract.image_to_string(image)
+        ocr_text = pytesseract.image_to_string(image, lang=TESSERACT_LANGS)
 
         cleaned_text = re.sub(r"[^a-zA-Z0-9\s@+./:,-_|]", " ", ocr_text)
         cleaned_text = cleaned_text.replace("\n", " ").replace("  ", " ")
@@ -170,7 +165,6 @@ async def extract_text_from_pdf(pdf_path: Path) -> Dict[str, Union[str, List[str
             for page_num, page in enumerate(reader.pages):
                 extracted_text += page.extract_text() + "\n"
         
-        # Handle tables if present
         if has_tables:
             with pdfplumber.open(pdf_path) as pdf:
                 for page_num, page in enumerate(pdf.pages):
@@ -180,7 +174,6 @@ async def extract_text_from_pdf(pdf_path: Path) -> Dict[str, Union[str, List[str
                             extracted_text += formatted_row + "\n"
                         extracted_text += "\n"
         
-        # Handle images with OCR if present
         if pages_with_images:
             pages = convert_from_path(
                 pdf_path,
@@ -200,7 +193,6 @@ async def extract_text_from_pdf(pdf_path: Path) -> Dict[str, Union[str, List[str
         cleaned_text = re.sub(r"[^a-zA-Z0-9\s@+./:,-_|]", " ", extracted_text)
         cleaned_text = cleaned_text.replace("\n", " ").replace("  ", " ")
 
-        # Validate if it's a resume
         is_resume = _validate_resume_content(cleaned_text)
 
         plain_links = _extract_plain_text_links(cleaned_text)
@@ -223,7 +215,7 @@ async def process_docs(source: Union[str, UploadFile]) -> Dict:
 
     tmp_path: Optional[Path] = None
     try:
-        # Validation
+
         if isinstance(source, str):
             ext = Path(source).suffix.lower() or ".pdf"
         else:
