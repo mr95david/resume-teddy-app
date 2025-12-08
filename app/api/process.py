@@ -78,13 +78,13 @@ async def upload_documents(
             
             extract_info = await process_docs(file)
             # extract_info["original_name"] = file.filename
-            extract_info["idx_document"]  = str(idx) + " - " + file.filename 
+            extract_info["idx_document"]  = str(idx) + " - " + file.filename
+            
             document_data.append(extract_info)
 
         # Ia processing
         if query is not None and query != "":
             response = await localAi_client.default_ask(user_query=query, resume_list=document_data)
-
         else:
             response = await localAi_client.sumarize_ask(resume_list=document_data)
         print(response)

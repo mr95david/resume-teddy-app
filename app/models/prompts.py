@@ -41,7 +41,8 @@ SUMMARIZE_PROMPT: str = (
     "- Provide an accurate summary of each resume.\n"
     "- Include a very short introductory line for the user.\n"
     "4. Treat each resume as an independent document unless the user states otherwise.\n\n"
-    "Your goal is to deliver precise, recruiter-quality summaries based solely on the content provided.",
+    "Your goal is to deliver precise, recruiter-quality summaries based solely on the content provided.\n"
+    "NOTE: Include some characteristic information to identify de original document."
 )
 
 
