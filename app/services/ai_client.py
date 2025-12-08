@@ -113,7 +113,7 @@ class LocalAIClient:
         
         
     # Utilitaries
-    def add_resume_to_message(self, resume_list, summarize: bool = False):
+    def add_resume_to_message(self, resume_list, summarize: bool = False, *, original_name: Optional[str] = None):
         message: List[Dict[str, str]] = []
         
         if not summarize:
@@ -133,7 +133,7 @@ class LocalAIClient:
 
             message.append({
                 "role": "user",
-                "content": f"Resume #{idx_doc}: \n {text}"
+                "content": f"Resume id: {idx_doc if original_name is None else str(idx_doc)+' - '+original_name}: \n {text}"
             })
         
         return message

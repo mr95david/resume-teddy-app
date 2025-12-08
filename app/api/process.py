@@ -56,15 +56,6 @@ async def upload_documents(
     star_time = datetime.now()
     document_data: list = []
 
-    # TODO: Eliminar
-    sample_return = QueryResponse(
-        user_id="",
-        request_id=str(request_id),
-        query=None,
-        resultado="Resultado final",
-        timestamp=star_time
-    )
-
     try:
         for idx, file in enumerate(files, start=1):
             _type_file = file.filename.split(".")[-1]
@@ -87,8 +78,9 @@ async def upload_documents(
             response = await localAi_client.default_ask(user_query=query, resume_list=document_data)
         else:
             response = await localAi_client.sumarize_ask(resume_list=document_data)
-        print(response)
-        return sample_return
+        
+        return_structure = QueryResponse(user_id=user_id, request_id=str(request_id), query=query, resultado=response, timestamp=star_time)
+        return return_structure
 
     except HTTPException:
         raise
