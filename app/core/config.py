@@ -1,10 +1,6 @@
 # libs
-from pydantic import BaseModel
-from pydantic import computed_field
-from pydantic_settings import BaseSettings
-from pydantic_settings import SettingsConfigDict
-from pydantic import SecretStr
-
+from pydantic import BaseModel, computed_field, SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 

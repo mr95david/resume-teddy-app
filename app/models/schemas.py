@@ -12,3 +12,4 @@ class QueryResponse(BaseModel):
     
     resultado:  str      = Field(..., description="Processed result or system output")
     timestamp:  datetime = Field(..., description="Timestamp of request processing")
+
