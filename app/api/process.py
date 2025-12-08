@@ -8,6 +8,8 @@ from app.models.schemas             import QueryResponse
 from app.services.document_service  import process_docs
 from app.models.constants           import TYPE_FILE
 from app.models.constants           import TYPE_IMG
+
+from app.services.ai_client         import localAi_client
 # Typing libs
 from typing import List
 from typing import Optional
@@ -75,10 +77,17 @@ async def upload_documents(
                 )
             
             extract_info = await process_docs(file)
-            extract_info["idx_document"] = idx
+            # extract_info["original_name"] = file.filename
+            extract_info["idx_document"]  = str(idx) + " - " + file.filename 
             document_data.append(extract_info)
 
-        print(document_data)
+        # Ia processing
+        if query is not None and query != "":
+            response = await localAi_client.default_ask(user_query=query, resume_list=document_data)
+
+        else:
+            response = await localAi_client.sumarize_ask(resume_list=document_data)
+        print(response)
         return sample_return
 
     except HTTPException:

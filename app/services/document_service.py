@@ -261,12 +261,12 @@ async def process_docs(source: Union[str, UploadFile]) -> Dict:
             hyperlinks = await extract_hyperlinks(tmp_path)
 
             all_links = list(set(hyperlinks + text_result["links"]))
-
+        
         return {
-            "status": True,
             "cleaned_text": text_result["cleaned_text"],
+            "is_resume": text_result.get("is_resume", False),
             "links": all_links,
-            "is_resume": text_result.get("is_resume", False)
+            "status": True,
         }
 
     except Exception as e:

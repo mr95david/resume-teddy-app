@@ -1,5 +1,7 @@
 
+from openai import AsyncOpenAI
 from openai import OpenAI
+from app.core.config    import settings
 from app.models.prompts import SYSTEM_PROMPT
 from app.models.prompts import SUMMARIZE_PROMPT
 #
@@ -8,6 +10,8 @@ from typing import Dict
 from typing import List 
 from typing import Optional
 
+import asyncio
+import httpx
 import requests
 
 class LocalAIClient:
@@ -26,7 +30,7 @@ class LocalAIClient:
         
         if self.base_url.startswith("http://") or self.base_url.startswith("https://"):
             try:
-                self.client = OpenAI(base_url=self.base_url, api_key=self.api_key)
+                self.client = AsyncOpenAI(base_url=self.base_url, api_key=self.api_key)
                 return True
             
             except Exception as e:
@@ -34,48 +38,54 @@ class LocalAIClient:
         
         return False
     
-    def is_alive(self):
+    async def is_alive(self):
         try:
-            health = requests.get(self.base_url.replace("/v1", "") + "/healthz")
-            return health.status_code == 200
-        
+            _url = self.base_url.replace("/v1", "") + "/healthz"
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(_url, timeout=5.0)
+            return resp.status_code == 200
+
         except Exception:
             return False
         
-    def model_available(self):
+    async def model_available(self):
 
         try:
-            models = self.client.models.list()
+            models = await self.client.models.list()
             available = [m.id for m in models.data]
             return self.model_name in available
        
         except Exception:
             return False
     
-    def status(self) -> Dict[str, Any]:
-
+    async def status(self) -> Dict[str, Any]:
+        model_available, server_alive = await asyncio.gather(
+            self.model_available(),
+            self.is_alive(),
+        )
         return {
             "base_url": self.base_url,
             "model": self.model_name,
-            "model_available": self.model_available(),
-            "server_alive": self.is_alive(),
+            "model_available": model_available,
+            "server_alive": server_alive,
         }
     # End initial connection functions
 
     # simple chat request
-    def chat(self, messages: List[Dict[str, str]]):
+    async def chat(self, messages: List[Dict[str, str]]):
 
         try:
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model=self.model_name,
                 messages=messages,
+                max_tokens=12000,
             )
-            return response.choices[0].message["content"]
+            return response.choices[0].message.content
 
         except Exception as e:
             raise RuntimeError(f"[LocalAIClient] Request failed: {e}")
         
-    def default_ask(self, user_query: str, resume_list: List[Dict], *, system_prompt: str = SYSTEM_PROMPT):
+    async def default_ask(self, user_query: str, resume_list: List[Dict], *, system_prompt: str = SYSTEM_PROMPT):
         message: List[Dict[str, str]] = [
             {
                 "role": "system",
@@ -87,9 +97,10 @@ class LocalAIClient:
             }
         ]
         message.extend(self.add_resume_to_message(resume_list))
-        return self.chat(messages=message)
+        result = await self.chat(messages=message)
+        return result
     
-    def sumarize_ask(self, resume_list: List[Dict], *, system_prompt: str = SUMMARIZE_PROMPT):
+    async def sumarize_ask(self, resume_list: List[Dict], *, system_prompt: str = SUMMARIZE_PROMPT):
         message: List[Dict[str, str]] = [
             {
                 "role": "system",
@@ -97,7 +108,8 @@ class LocalAIClient:
             },
         ]
         message.extend(self.add_resume_to_message(resume_list, summarize=True))
-        return self.chat(messages=message)
+        result = await self.chat(messages=message)
+        return result
         
         
     # Utilitaries
@@ -125,3 +137,14 @@ class LocalAIClient:
             })
         
         return message
+
+    async def close(self):
+        if self.client is not None:
+            try:
+                await self.client.close()
+                print("LocalAIClient - Connection closed successfully.")
+            except Exception as e:
+                print("LocalAIClient Connection closed with warnings: {e}")
+
+    
+localAi_client = LocalAIClient(base_url=settings.LOCALAI_BASE_URL, model_name=settings.LOCALAI_MODEL_NAME, api_key=settings.LOCALAI_SECRET_KEY.get_secret_value())
