@@ -11,7 +11,7 @@ from app.models.constants           import TYPE_IMG
 # Typing libs
 from typing import List
 from typing import Optional
-
+# Utilitaries
 import uuid
 from datetime import datetime
 
@@ -52,6 +52,7 @@ async def upload_documents(
     ):
     if request_id is None: request_id = uuid.uuid4()
     star_time = datetime.now()
+    document_data: list = []
 
     # TODO: Eliminar
     sample_return = QueryResponse(
@@ -61,9 +62,9 @@ async def upload_documents(
         resultado="Resultado final",
         timestamp=star_time
     )
-    
+
     try:
-        for idx, file in enumerate(files):
+        for idx, file in enumerate(files, start=1):
             _type_file = file.filename.split(".")[-1]
             
             # Type validation
@@ -73,7 +74,12 @@ async def upload_documents(
                     detail=f"Unsupported file type. Allowed formats are: PDF, JPG, and PNG."
                 )
             
-            return sample_return
+            extract_info = await process_docs(file)
+            extract_info["idx_document"] = idx
+            document_data.append(extract_info)
+
+        print(document_data)
+        return sample_return
 
     except HTTPException:
         raise

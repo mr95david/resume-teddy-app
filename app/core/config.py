@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     MONGODB_PASSWORD: Optional[SecretStr] = None
     MONGODB_AUTH_SOURCE: str = "admin"
 
+    LOCALAI_BASE_URL: str = "http://localhost:8080/v1"
+    LOCALAI_MODEL_NAME: Optional[str] = ""
+    LOCALAI_SECRET_KEY: Optional[SecretStr] = None
+
     TESSERACT_CMD: Optional[str] = None
     POPLLER_PATH : Optional[str] = None
 

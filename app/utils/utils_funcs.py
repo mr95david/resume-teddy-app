@@ -7,7 +7,7 @@ from app.db.mongo    import close_mongo_connection
 #
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-
+    
     await connect_to_mongo()
 
     yield
